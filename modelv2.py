@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from mesa.discrete_space import CellAgent, OrthogonalMooreGrid
 
 
+from mesa.datacollection import DataCollector
+
 
 from mesa import Agent
 class LanguageAgent(CellAgent):
@@ -177,7 +179,6 @@ class LanguageAgent(CellAgent):
                     newLang = self.model.createLanguageMutuation(self, interactAgent)
                     self.language = newLang
                     interactAgent.language = newLang
-                    print(newLang)
                 else:
                     self.language = interactAgent.language
 
@@ -198,8 +199,8 @@ class LanguageModel(Model):
         numAgents=100,
         P=None,
         r=1,
-        probThresh=0.1,
-        mutationProb=0.1,
+        probThresh=0.05,
+        mutationProb=0.01,
         languageNum=2
     ):
         super().__init__()
@@ -210,8 +211,17 @@ class LanguageModel(Model):
         self.probThreshold = probThresh
         self.mutationProb = mutationProb
         self.languageNum = languageNum
-        self.languageNetwork = None
+        self.languageNetwork = nx.DiGraph()
+        self.totalMutations = 0
 
+
+        self.datacollector = DataCollector(
+            model_reporters={
+                "num_languages": lambda m: m.languageNum,  # ever created
+                "num_mutations": lambda m: m.totalMutations,
+                "num_languages_alive": lambda m: len({a.language for a in m.agents}),
+                    }
+                )
 
         
 
@@ -220,7 +230,7 @@ class LanguageModel(Model):
         if P is None:
             P = np.zeros((languageNum, languageNum))
             for i in range(languageNum):
-                stay_prob = np.random.uniform(0.7, 0.9)  
+                stay_prob = np.random.uniform(0.8, 0.9)  
                 mutate_prob = 1 - stay_prob
                 if i < languageNum - 1:
                     P[i, i] = stay_prob
@@ -261,27 +271,26 @@ class LanguageModel(Model):
 
 
     
-    def updateLanguageNetwork(self, agent1, agent2):
-        lang1 = agent1.language
-        lang2 = agent2.language
-        mutationOrigin = np.random.choice([lang1, lang2])
+    def updateLanguageNetwork(self, newId, mutation_origin):
         network = self.languageNetwork
-        network.add_node((lang1, lang2))
-        new_node = (lang1, lang2)
-        if new_node not in network:
-            network.add_node(new_node, origin=mutationOrigin)
-
-            for target_lang, prob in enumerate(self.P[mutationOrigin]):
+        if newId not in network:
+            network.add_node(newId, origin=mutation_origin)
+            for targetLang, prob in enumerate(self.P[mutation_origin]):
                 if prob > 0:
-                    network.add_edge(new_node, target_lang, weight=prob)
+                    network.add_edge(newId, targetLang, weight=prob)
+
+        
         self.languageNetwork = network
-        pass
+        
+
+
 
     def createLanguageMutuation(self, agent1, agent2):
         lang1 = agent1.language
         lang2 = agent2.language
         oldP = self.P
         nOld = self.languageNum
+        newId = nOld
         mutation_origin = np.random.choice([lang1, lang2])
         newP = np.zeros((self.languageNum + 1, self.languageNum + 1))
         for i in range(self.languageNum):
@@ -296,7 +305,8 @@ class LanguageModel(Model):
         newP[newId, newId] = oldP[mutation_origin, mutation_origin] * 0.9  
         self.P = newP
         self.languageNum += 1
-        self.updateLanguageNetwork(agent1, agent2)
+        self.totalMutations += 1
+        self.updateLanguageNetwork(newId, mutation_origin)
         return newId
     
 
@@ -304,7 +314,7 @@ class LanguageModel(Model):
     def step(self):
     # Use Mesa's AgentSet: shuffle and call .step() on each agent
         self.agents.shuffle_do("step")
-
+        self.datacollector.collect(self)
 
     def debug_cell_occupancy(self):
         total_agents = len(self.agents)
