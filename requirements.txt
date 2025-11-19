@@ -1,0 +1,6 @@
+solara
+mesa
+numpy
+pandas
+networkx
+matplotlib
