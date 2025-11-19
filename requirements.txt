@@ -4,3 +4,4 @@ numpy
 pandas
 networkx
 matplotlib
+altair
