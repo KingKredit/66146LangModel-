@@ -135,7 +135,6 @@ def LanguageNetworkComponent(model: LanguageModel):
 
 
 
-
 language_model = LanguageModel(
     width=20,
     height=20,
