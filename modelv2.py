@@ -56,33 +56,26 @@ class LanguageAgent(CellAgent):
             newX = self.pos[0] + dx
             newY = self.pos[1] + dy
             if not (0 <= newX < self.model.grid.width and 0 <= newY < self.model.grid.height):
-                # validMoves.append((newX, newY))
                 continue
 
             targetPos = (newX, newY)
             if targetPos == self.pos:
                 validMoves.append(targetPos)
                 continue
-                    
-
             targetCell = None
             for cell in self.model.grid.all_cells.cells:
                 if cell.coordinate == targetPos:
                     targetCell = cell
                     break
-
             if targetCell is None:
                 continue  # shouldn't happen, but be safe
-
-            # only allow move if the cell is empty (no agents there)
             if len(targetCell.agents) == 0:
-                validMoves.append(targetPos)
-                
+                validMoves.append(targetPos) 
         return validMoves
     
 
     def getInteractableNeighbours(self):
-    # Neighbor cells around our current cell
+   
         neighbor_cells = self.cell.get_neighborhood(
             radius=self.model.interactionRadius,
             include_center=False,
@@ -91,7 +84,7 @@ class LanguageAgent(CellAgent):
         interactableNeighbours = []
         P = self.model.P
 
-        # Each neighbor cell can contain multiple agents
+       
         for nbr_cell in neighbor_cells:
             for neighbor in nbr_cell.agents:
                 if P[self.language, neighbor.language] >= self.model.probThreshold:
@@ -127,7 +120,12 @@ class LanguageAgent(CellAgent):
         directions = list(scores.keys())   
         weights    = list(scores.values()) 
         if not interactableNeighbours:
-            return self.pos
+            p1 = self.random.random() 
+            if p1 > 0.6:
+                drow, dcol = self.moves[self.random.choice(list(self.moves))]
+                return (self.pos[0] + drow, self.pos[1] + dcol)
+            else:
+                return self.pos
         else:
             chosen_dir = self.random.choices(directions, weights=weights, k=1)[0]
             direction = self.moves[chosen_dir]
@@ -160,7 +158,6 @@ class LanguageAgent(CellAgent):
         # update our references
         self.cell = target_cell
         self.pos = newPos
-        print(self.pos)
 
 
 
@@ -324,7 +321,7 @@ class LanguageModel(Model):
             if len(cell.agents) > 1:
                 multi_cells += 1
 
-        print(f"Total agents: {total_agents}, cells with >1 agent: {multi_cells}")
+        # print(f"Total agents: {total_agents}, cells with >1 agent: {multi_cells}") 
 
     
 
