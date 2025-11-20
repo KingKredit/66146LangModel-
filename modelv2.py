@@ -11,6 +11,7 @@ from mesa.discrete_space import CellAgent, OrthogonalMooreGrid
 
 
 from mesa.datacollection import DataCollector
+from collections import Counter
 
 
 from mesa import Agent
@@ -249,9 +250,22 @@ class LanguageModel(Model):
 
 
     def _create_agents(self):
+    # pick random cells for the agents as before
         cells = self.random.choices(self.grid.all_cells.cells, k=self.numAgents)
-        languages = self.random.choices(range(self.languageNum), k=self.numAgents)
+
+        # assign languages based on the x-coordinate (vertical bands)
+        languages = []
+        band_width = self.width / self.languageNum
+
+        for cell in cells:
+            x, y = cell.coordinate
+            lang_id = min(int(x / band_width), self.languageNum - 1)
+            print("ID", lang_id)
+            languages.append(lang_id)
+
+        # create the agents with these clustered starting languages
         LanguageAgent.create_agents(self, self.numAgents, cells, languages)
+
 
 
     def createNetwork(self):

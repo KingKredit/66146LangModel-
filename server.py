@@ -2,7 +2,7 @@ import solara as sl
 
 from modelv2 import LanguageModel
 
-
+from collections import Counter
 import solara as sl
 from mesa.visualization import SolaraViz, SpaceRenderer, make_plot_component
 from mesa.visualization.components import AgentPortrayalStyle
@@ -27,10 +27,10 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 
 def language_to_color(lang_id: int) -> str:
-    # map integer ID into [0, 1] for a smooth colormap
-    x = (lang_id % 256) / 256  # still wraps eventually, but has many more unique colors
-    rgba = cm.get_cmap("hsv")(x)
+    hue = (lang_id * 0.61803398875) % 1.0
+    rgba = cm.get_cmap("hsv")(hue)
     return mcolors.to_hex(rgba)
+
 
 def agent_portrayal(agent):
     color = language_to_color(int(agent.language))
@@ -101,6 +101,34 @@ model_params = {
     },
 }
 
+@sl.component
+def LanguageDistributionPlot(model):
+    # 1. Count how many agents are in each language
+    languages = [int(agent.language) for agent in model.agents]
+    counts = Counter(languages)
+
+    # Sort by language ID for a stable order
+    lang_ids = sorted(counts.keys())
+    values = [counts[l] for l in lang_ids]
+
+    # 2. Get the same colors you use on the grid
+    colors = [language_to_color(l) for l in lang_ids]
+
+    # 3. Build a Matplotlib bar chart
+    fig, ax = plt.subplots()
+    ax.bar(range(len(lang_ids)), values, color=colors)
+    ax.set_xticks(range(len(lang_ids)))
+    ax.set_xticklabels(lang_ids)
+    ax.set_xlabel("Language ID")
+    ax.set_ylabel("Number of agents")
+    ax.set_title("Current language distribution")
+
+    # 4. Render in Solara
+    return sl.FigureMatplotlib(fig)
+
+
+def language_distribution_component(model):
+    return LanguageDistributionPlot(model)
 
 @sl.component
 def LanguageNetworkComponent(model: LanguageModel):
@@ -151,11 +179,14 @@ renderer = SpaceRenderer(model=language_model, backend="matplotlib").render(
 
 # no page argument = page 0
 mut_and_lang_plot = make_plot_component(
-    ["num_languages", "num_mutations"]
+    ["num_mutations"]
 )
+
+
 
 # no tuple, just the component = page 0
 language_network_component = LanguageNetworkComponent
+
 
 viz = SolaraViz(
     language_model,
@@ -163,6 +194,8 @@ viz = SolaraViz(
     components=[
         mut_and_lang_plot,
         language_network_component,
+        language_distribution_component, 
+
     ],
     model_params=model_params,
     name="Language Evolution Model",
