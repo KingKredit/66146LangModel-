@@ -88,9 +88,7 @@ class LanguageAgent(CellAgent):
        
         for nbr_cell in neighbor_cells:
             for neighbor in nbr_cell.agents:
-                if P[self.language, neighbor.language] >= self.model.probThreshold:
                     interactableNeighbours.append(neighbor)
-        print(interactableNeighbours)
         return interactableNeighbours
 
     
@@ -171,9 +169,19 @@ class LanguageAgent(CellAgent):
             interactAgent = self.random.choice(neighbours)
             P = self.model.P
             p = P[self.language, interactAgent.language]
-            u = self.random.random()
-            if p > u:
-                if self.random.random() < self.model.mutationProb:
+            row = P[self.language]
+            max_off_diag = max(v for k, v in enumerate(row) if k != self.language)
+
+            # mutation logic changes 
+            i = int(self.language)                     # current language index
+            stability = self.model.P[i, i]            # P[ii], after normalization
+            base_mu = self.model.mutationProb   
+            scale = 0.4      # what the slider controls
+            effectiveMu = base_mu * (1 - stability) * scale
+
+            if P[self.language, interactAgent.language] >= self.model.probThreshold * max_off_diag:
+            # if p > self.model.probThreshold:
+                if self.random.random() < effectiveMu:
                     newLang = self.model.createLanguageMutuation(self, interactAgent)
                     self.language = newLang
                     interactAgent.language = newLang
@@ -228,7 +236,7 @@ class LanguageModel(Model):
         if P is None:
             P = np.zeros((languageNum, languageNum))
             for i in range(languageNum):
-                stay_prob = np.random.uniform(0.8, 0.9)  
+                stay_prob = np.random.uniform(0.9, 0.95)  
                 mutate_prob = 1 - stay_prob
                 if i < languageNum - 1:
                     P[i, i] = stay_prob
@@ -237,6 +245,8 @@ class LanguageModel(Model):
                     P[i, i] = 1.0 
         P = np.round(P, 3)
         self.P = P
+        self.normalize_P_rows()
+        print(self.P)
 
         self.grid = OrthogonalMooreGrid(
                 (width, height),
@@ -247,6 +257,7 @@ class LanguageModel(Model):
 
         self._create_agents()
         self.languageNetwork = self.createNetwork()
+
 
 
     def _create_agents(self):
@@ -260,7 +271,7 @@ class LanguageModel(Model):
         for cell in cells:
             x, y = cell.coordinate
             lang_id = min(int(x / band_width), self.languageNum - 1)
-            print("ID", lang_id)
+
             languages.append(lang_id)
 
         # create the agents with these clustered starting languages
@@ -315,9 +326,11 @@ class LanguageModel(Model):
 
         newP[newId, newId] = oldP[mutation_origin, mutation_origin] * 0.9  
         self.P = newP
+        self.normalize_P_rows()
         self.languageNum += 1
         self.totalMutations += 1
         self.updateLanguageNetwork(newId, mutation_origin)
+        print(newId)
         return newId
     
 
@@ -337,7 +350,12 @@ class LanguageModel(Model):
 
         # print(f"Total agents: {total_agents}, cells with >1 agent: {multi_cells}") 
 
-    
+    # some more functionality to make the model more realistic 
+    def normalize_P_rows(self):
+        for i in range(self.languageNum):
+            row_sum = sum(self.P[i])
+            if row_sum > 0:
+                self.P[i] = [x / row_sum for x in self.P[i]]
 
     
     def validate_state(self):
